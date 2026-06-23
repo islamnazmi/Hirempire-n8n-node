@@ -1,0 +1,9 @@
+{
+	"extends": "@n8n/node-cli/tsconfig.json",
+	"compilerOptions": {
+		"rootDir": ".",
+		"outDir": "./dist"
+	},
+	"include": ["credentials/**/*", "nodes/**/*"],
+	"exclude": ["node_modules", "dist"]
+}
