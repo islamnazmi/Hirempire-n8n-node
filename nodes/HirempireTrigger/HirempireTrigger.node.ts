@@ -7,7 +7,6 @@ import type {
 	IWebhookFunctions,
 	IWebhookResponseData,
 } from 'n8n-workflow';
-import { NodeConnectionTypes } from 'n8n-workflow';
 
 const BASE_URL = 'https://api.hirempire.com/v1';
 
@@ -34,7 +33,7 @@ export class HirempireTrigger implements INodeType {
 			name: 'Hirempire Trigger',
 		},
 		inputs: [],
-		outputs: [NodeConnectionTypes.Main],
+		outputs: ['main'],
 		credentials: [
 			{
 				name: 'hirempireApi',
