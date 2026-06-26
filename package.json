@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-hirempire",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"description": "n8n community node for Hirempire — AI recruitment platform. Trigger on Hirempire webhook events and manage jobs, candidates, CVs and meetings.",
 	"license": "MIT",
 	"homepage": "https://www.hirempire.com",
