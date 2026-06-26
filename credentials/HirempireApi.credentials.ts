@@ -45,17 +45,27 @@ export class HirempireApi implements ICredentialType {
 		},
 		rules: [
 			{
-				type: 'responseCode',
+				type: 'responseSuccessBody',
 				properties: {
-					value: 401,
+					key: 'reason',
+					value: 'invalid_token',
 					message: 'Invalid API token. Generate a new one in Hirempire under Settings → API Tokens.',
 				},
 			},
 			{
-				type: 'responseCode',
+				type: 'responseSuccessBody',
 				properties: {
-					value: 403,
+					key: 'reason',
+					value: 'forbidden',
 					message: 'This API token does not have permission to access n8n integrations.',
+				},
+			},
+			{
+				type: 'responseSuccessBody',
+				properties: {
+					key: 'reason',
+					value: 'expired',
+					message: 'API token has expired. Generate a new one in Hirempire under Settings → API Tokens.',
 				},
 			},
 			{
