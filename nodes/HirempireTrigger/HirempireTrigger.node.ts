@@ -7,6 +7,7 @@ import type {
 	IWebhookFunctions,
 	IWebhookResponseData,
 } from 'n8n-workflow';
+import { NodeConnectionTypes } from 'n8n-workflow';
 
 const BASE_URL = 'https://api.hirempire.com/v1';
 
@@ -33,7 +34,7 @@ export class HirempireTrigger implements INodeType {
 			name: 'Hirempire Trigger',
 		},
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'hirempireApi',
@@ -73,7 +74,7 @@ export class HirempireTrigger implements INodeType {
 					'hirempireApi',
 					{
 						method: 'GET',
-						url: `${BASE_URL}/webhooks`,
+						url: `${BASE_URL}/n8n/webhook`,
 						json: true,
 					},
 				)) as IDataObject;
@@ -103,7 +104,7 @@ export class HirempireTrigger implements INodeType {
 					'hirempireApi',
 					{
 						method: 'GET',
-						url: `${BASE_URL}/webhooks`,
+						url: `${BASE_URL}/n8n/webhook`,
 						json: true,
 					},
 				)) as IDataObject;
@@ -115,7 +116,7 @@ export class HirempireTrigger implements INodeType {
 				if (existing) {
 					await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
 						method: 'PATCH',
-						url: `${BASE_URL}/webhook`,
+						url: `${BASE_URL}/n8n/webhook`,
 						body: { id: existing.id, events, active: true },
 						json: true,
 					});
@@ -128,7 +129,7 @@ export class HirempireTrigger implements INodeType {
 					'hirempireApi',
 					{
 						method: 'POST',
-						url: `${BASE_URL}/create-webhook`,
+						url: `${BASE_URL}/n8n/webhook`,
 						body: { request_url: webhookUrl, events },
 						json: true,
 					},
@@ -155,7 +156,7 @@ export class HirempireTrigger implements INodeType {
 				try {
 					await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
 						method: 'PATCH',
-						url: `${BASE_URL}/webhook`,
+						url: `${BASE_URL}/n8n/webhook`,
 						body: { id: webhookId, active: false },
 						json: true,
 					} as IHttpRequestOptions);

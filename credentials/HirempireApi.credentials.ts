@@ -40,7 +40,7 @@ export class HirempireApi implements ICredentialType {
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL: 'https://api.hirempire.com/v1',
-			url: '/jobs',
+			url: '/n8n/verify-credentials',
 			method: 'GET',
 		},
 	};
