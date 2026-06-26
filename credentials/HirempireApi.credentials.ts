@@ -43,5 +43,29 @@ export class HirempireApi implements ICredentialType {
 			url: '/n8n/verify-credentials',
 			method: 'GET',
 		},
+		rules: [
+			{
+				type: 'responseCode',
+				properties: {
+					value: 401,
+					message: 'Invalid API token. Generate a new one in Hirempire under Settings → API Tokens.',
+				},
+			},
+			{
+				type: 'responseCode',
+				properties: {
+					value: 403,
+					message: 'This API token does not have permission to access n8n integrations.',
+				},
+			},
+			{
+				type: 'responseSuccessBody',
+				properties: {
+					key: 'ok',
+					value: false,
+					message: 'Hirempire rejected the credentials. Verify the token is correct and active.',
+				},
+			},
+		],
 	};
 }
