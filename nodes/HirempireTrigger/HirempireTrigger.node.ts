@@ -11,24 +11,6 @@ import { NodeConnectionTypes } from 'n8n-workflow';
 
 const BASE_URL = 'https://api.hirempire.com/v1';
 
-// n8n exposes only the URL for the current mode (test vs production), but the
-// Hirempire API needs both registered so events flow whether the user is
-// listening for a test event or running the activated workflow. Derive the
-// twin URL by swapping the `/v1/` and `/v1-test/` prefixes. Falls back to
-// the single URL if the pattern doesn't match (e.g. someone overrides n8n's
-// WEBHOOK_URL with a different scheme).
-function deriveBothUrls(url: string): string[] {
-	const testMatch = url.match(/^(https?:\/\/[^/]+)\/v1-test\/(.+)$/);
-	if (testMatch) {
-		return [`${testMatch[1]}/v1/${testMatch[2]}`, url];
-	}
-	const prodMatch = url.match(/^(https?:\/\/[^/]+)\/v1\/(.+)$/);
-	if (prodMatch) {
-		return [url, `${prodMatch[1]}/v1-test/${prodMatch[2]}`];
-	}
-	return [url];
-}
-
 const EVENT_OPTIONS = [
 	{ name: 'Applicant Applied', value: 'applicant_applied', description: 'A candidate applied to one of your jobs' },
 	{ name: 'CV Upload Completed', value: 'cv_upload_completed', description: 'CV processing and analysis finished' },
@@ -84,7 +66,7 @@ export class HirempireTrigger implements INodeType {
 	webhookMethods = {
 		default: {
 			async checkExists(this: IHookFunctions): Promise<boolean> {
-				const urls = deriveBothUrls(this.getNodeWebhookUrl('default') as string);
+				const webhookUrl = this.getNodeWebhookUrl('default');
 
 				const response = (await this.helpers.httpRequestWithAuthentication.call(
 					this,
@@ -97,21 +79,18 @@ export class HirempireTrigger implements INodeType {
 				)) as IDataObject;
 
 				const webhooks = (response.data as IDataObject[]) ?? [];
-
-				return urls.every((url) =>
-					webhooks.some(
-						(hook) => hook.request_url === url && hook.active === true,
-					),
+				return webhooks.some(
+					(hook) => hook.request_url === webhookUrl && hook.active === true,
 				);
 			},
 
 			async create(this: IHookFunctions): Promise<boolean> {
-				const urls = deriveBothUrls(this.getNodeWebhookUrl('default') as string);
+				const webhookUrl = this.getNodeWebhookUrl('default');
 				const events = this.getNodeParameter('events') as string[];
 
-				// Pull the full list once so we can decide per-URL whether to PATCH or POST.
-				// Reusing a previously deactivated webhook for the same URL avoids leaking
-				// inactive rows on Hirempire's side, since there is no delete endpoint.
+				// PATCH an existing (likely-inactive) row for the same URL if there is
+				// one, otherwise POST a new one. checkExists only returns true for
+				// active rows, so a present-but-inactive row falls through to here.
 				const list = (await this.helpers.httpRequestWithAuthentication.call(
 					this,
 					'hirempireApi',
@@ -121,32 +100,31 @@ export class HirempireTrigger implements INodeType {
 						json: true,
 					},
 				)) as IDataObject;
-				const webhooks = (list.data as IDataObject[]) ?? [];
+				const existing = ((list.data as IDataObject[]) ?? []).find(
+					(hook) => hook.request_url === webhookUrl,
+				);
 
-				for (const url of urls) {
-					const existing = webhooks.find((hook) => hook.request_url === url);
-					if (existing) {
-						await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
-							method: 'PATCH',
-							url: `${BASE_URL}/n8n/webhook`,
-							body: { id: existing.id, events, active: true },
-							json: true,
-						});
-					} else {
-						await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
-							method: 'POST',
-							url: `${BASE_URL}/n8n/webhook`,
-							body: { request_url: url, events },
-							json: true,
-						});
-					}
+				if (existing) {
+					await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
+						method: 'PATCH',
+						url: `${BASE_URL}/n8n/webhook`,
+						body: { id: existing.id, events, active: true },
+						json: true,
+					});
+				} else {
+					await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
+						method: 'POST',
+						url: `${BASE_URL}/n8n/webhook`,
+						body: { request_url: webhookUrl, events },
+						json: true,
+					});
 				}
 
 				return true;
 			},
 
 			async delete(this: IHookFunctions): Promise<boolean> {
-				const urls = deriveBothUrls(this.getNodeWebhookUrl('default') as string);
+				const webhookUrl = this.getNodeWebhookUrl('default');
 
 				const list = (await this.helpers.httpRequestWithAuthentication.call(
 					this,
@@ -157,23 +135,21 @@ export class HirempireTrigger implements INodeType {
 						json: true,
 					},
 				)) as IDataObject;
-				const webhooks = (list.data as IDataObject[]) ?? [];
+				const existing = ((list.data as IDataObject[]) ?? []).find(
+					(hook) => hook.request_url === webhookUrl,
+				);
 
-				// Deactivate each known URL; missing rows are fine (already gone).
-				// The Hirempire API has no delete-webhook endpoint, so we PATCH to inactive.
-				for (const url of urls) {
-					const existing = webhooks.find((hook) => hook.request_url === url);
-					if (!existing) continue;
-					try {
-						await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
-							method: 'PATCH',
-							url: `${BASE_URL}/n8n/webhook`,
-							body: { id: existing.id, active: false },
-							json: true,
-						} as IHttpRequestOptions);
-					} catch {
-						return false;
-					}
+				if (!existing) return true;
+
+				try {
+					await this.helpers.httpRequestWithAuthentication.call(this, 'hirempireApi', {
+						method: 'DELETE',
+						url: `${BASE_URL}/n8n/webhook`,
+						qs: { id: existing.id },
+						json: true,
+					} as IHttpRequestOptions);
+				} catch {
+					return false;
 				}
 
 				return true;
