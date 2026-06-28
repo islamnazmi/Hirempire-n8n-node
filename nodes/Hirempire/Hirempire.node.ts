@@ -20,7 +20,7 @@ export class Hirempire implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Manage jobs, applicants and companies in Hirempire',
+		description: 'Manage jobs, candidates and companies in Hirempire',
 		defaults: {
 			name: 'Hirempire',
 		},
@@ -39,7 +39,7 @@ export class Hirempire implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				options: [
-					{ name: 'Applicant', value: 'applicant' },
+					{ name: 'Candidate', value: 'candidate' },
 					{ name: 'Company', value: 'company' },
 					{ name: 'Job', value: 'job' },
 				],
@@ -63,6 +63,12 @@ export class Hirempire implements INodeType {
 						description: 'Create a new job posting',
 					},
 					{
+						name: 'Create Source',
+						value: 'createSource',
+						action: 'Create a job source link',
+						description: 'Create a source link for a job (idempotent on job + source name)',
+					},
+					{
 						name: 'Delete',
 						value: 'delete',
 						action: 'Delete a job',
@@ -81,6 +87,12 @@ export class Hirempire implements INodeType {
 						description: 'Retrieve many jobs',
 					},
 					{
+						name: 'Get Sources',
+						value: 'getSources',
+						action: 'Get job source links',
+						description: 'List source links configured for a job',
+					},
+					{
 						name: 'Update Status',
 						value: 'updateStatus',
 						action: 'Update job status',
@@ -91,38 +103,38 @@ export class Hirempire implements INodeType {
 			},
 
 			// ----------------------------------
-			//          Applicant operations
+			//          Candidate operations
 			// ----------------------------------
 			{
 				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
-				displayOptions: { show: { resource: ['applicant'] } },
+				displayOptions: { show: { resource: ['candidate'] } },
 				options: [
 					{
 						name: 'Get',
 						value: 'get',
-						action: 'Get an applicant',
-						description: 'Retrieve a single applicant by ID',
+						action: 'Get a candidate',
+						description: 'Retrieve a single candidate by ID',
 					},
 					{
 						name: 'Get Many',
 						value: 'getAll',
-						action: 'Get many applicants',
-						description: 'Retrieve many applicants',
+						action: 'Get many candidates',
+						description: 'Retrieve many candidates',
 					},
 					{
 						name: 'Get Many by Job',
 						value: 'getByJob',
-						action: 'Get many applicants by job',
-						description: 'Retrieve all applicants for a specific job',
+						action: 'Get many candidates by job',
+						description: 'Retrieve all candidates for a specific job',
 					},
 					{
-						name: 'Update Status',
-						value: 'updateStatus',
-						action: 'Update applicant status',
-						description: 'Update the status of an applicant',
+						name: 'Update',
+						value: 'update',
+						action: 'Update a candidate',
+						description: 'Update fields on a candidate (status, tags, pool stage, note)',
 					},
 				],
 				default: 'getAll',
@@ -160,7 +172,7 @@ export class Hirempire implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['job'],
-						operation: ['get', 'delete', 'updateStatus'],
+						operation: ['get', 'delete', 'updateStatus', 'getSources', 'createSource'],
 					},
 				},
 				description: 'The unique identifier of the job',
@@ -332,6 +344,21 @@ export class Hirempire implements INodeType {
 						description: 'Whether to hide the salary on the public job posting',
 					},
 					{
+						displayName: 'Industry',
+						name: 'industry',
+						type: 'string',
+						default: '',
+						description: 'Industry classification',
+					},
+					{
+						displayName: 'Public Slug',
+						name: 'public_slug',
+						type: 'string',
+						default: '',
+						description:
+							'URL slug for the public job board page. If omitted, auto-generated from the job title.',
+					},
+					{
 						displayName: 'Status',
 						name: 'status',
 						type: 'options',
@@ -339,7 +366,6 @@ export class Hirempire implements INodeType {
 						options: [
 							{ name: 'Active', value: 'Active' },
 							{ name: 'Closed', value: 'Closed' },
-							{ name: 'Hired', value: 'Hired' },
 							{ name: 'Paused', value: 'Paused' },
 							{ name: 'Pending', value: 'Pending' },
 						],
@@ -362,54 +388,133 @@ export class Hirempire implements INodeType {
 				options: [
 					{ name: 'Active', value: 'Active' },
 					{ name: 'Closed', value: 'Closed' },
-					{ name: 'Hired', value: 'Hired' },
 					{ name: 'Paused', value: 'Paused' },
 					{ name: 'Pending', value: 'Pending' },
 				],
 			},
 
 			// ----------------------------------
-			//          Applicant: ID fields
+			//      Job: create source fields
 			// ----------------------------------
 			{
-				displayName: 'Applicant ID',
-				name: 'applicantId',
+				displayName: 'Source Name',
+				name: 'sourceName',
+				type: 'string',
+				required: true,
+				default: '',
+				placeholder: 'LinkedIn',
+				displayOptions: { show: { resource: ['job'], operation: ['createSource'] } },
+				description: 'Label for the source (e.g. LinkedIn, Indeed, Referral)',
+			},
+
+			// ----------------------------------
+			//          Candidate: ID fields
+			// ----------------------------------
+			{
+				displayName: 'Candidate ID',
+				name: 'candidateId',
 				type: 'string',
 				required: true,
 				default: '',
 				displayOptions: {
-					show: { resource: ['applicant'], operation: ['get', 'updateStatus'] },
+					show: { resource: ['candidate'], operation: ['get', 'update'] },
 				},
-				description: 'The unique identifier of the applicant',
+				description: 'The unique identifier of the candidate',
 			},
 			{
 				displayName: 'Job ID',
-				name: 'applicantJobId',
+				name: 'candidateJobId',
 				type: 'string',
 				required: true,
 				default: '',
 				displayOptions: {
-					show: { resource: ['applicant'], operation: ['getByJob'] },
+					show: { resource: ['candidate'], operation: ['getByJob'] },
 				},
-				description: 'The unique identifier of the job to list applicants for',
+				description: 'The unique identifier of the job to list candidates for',
 			},
+
+			// ----------------------------------
+			//      Candidate: get-many filter
+			// ----------------------------------
 			{
-				displayName: 'Status',
-				name: 'applicantStatus',
+				displayName: 'Type',
+				name: 'candidateType',
 				type: 'options',
-				required: true,
-				default: 'Reviewed',
+				default: '',
 				displayOptions: {
-					show: { resource: ['applicant'], operation: ['updateStatus'] },
+					show: { resource: ['candidate'], operation: ['getAll'] },
+				},
+				description: 'Filter by candidate type. Leave empty for all types.',
+				options: [
+					{ name: 'All', value: '' },
+					{ name: 'Applicant', value: 'applicant' },
+					{ name: 'Prospect', value: 'prospect' },
+					{ name: 'Upload', value: 'upload' },
+				],
+			},
+
+			// ----------------------------------
+			//      Candidate: update fields
+			// ----------------------------------
+			{
+				displayName: 'Update Fields',
+				name: 'candidateUpdateFields',
+				type: 'collection',
+				placeholder: 'Add Field',
+				default: {},
+				displayOptions: {
+					show: { resource: ['candidate'], operation: ['update'] },
 				},
 				options: [
-					{ name: 'Accepted', value: 'Accepted' },
-					{ name: 'Applied', value: 'Applied' },
-					{ name: 'Hired', value: 'Hired' },
-					{ name: 'Met', value: 'Met' },
-					{ name: 'Rejected', value: 'Rejected' },
-					{ name: 'Reviewed', value: 'Reviewed' },
-					{ name: 'Scheduled', value: 'Scheduled' },
+					{
+						displayName: 'Status',
+						name: 'status',
+						type: 'options',
+						default: 'screening',
+						options: [
+							{ name: 'Applied', value: 'applied' },
+							{ name: 'Hired', value: 'hired' },
+							{ name: 'Interview', value: 'interview' },
+							{ name: 'Offer', value: 'offer' },
+							{ name: 'On Hold', value: 'on_hold' },
+							{ name: 'Phone Screen', value: 'phone_screen' },
+							{ name: 'Qualified', value: 'qualified' },
+							{ name: 'Rejected', value: 'rejected' },
+							{ name: 'Screening', value: 'screening' },
+							{ name: 'Shortlisted', value: 'shortlisted' },
+							{ name: 'Technical', value: 'technical' },
+							{ name: 'Uploaded', value: 'uploaded' },
+							{ name: 'Withdrawn', value: 'withdrawn' },
+						],
+					},
+					{
+						displayName: 'Tags',
+						name: 'tags',
+						type: 'string',
+						default: '',
+						placeholder: 'priority,referred',
+						description: 'Comma-separated list of tags. Replaces existing tags.',
+					},
+					{
+						displayName: 'Pool Stage',
+						name: 'pool_stage',
+						type: 'options',
+						default: 'warm',
+						options: [
+							{ name: 'Cold', value: 'cold' },
+							{ name: 'Hot', value: 'hot' },
+							{ name: 'Not Interested', value: 'not_interested' },
+							{ name: 'Warm', value: 'warm' },
+						],
+					},
+					{
+						displayName: 'Note to Candidate',
+						name: 'note_to_candidate',
+						type: 'string',
+						default: '',
+						typeOptions: { rows: 3 },
+						description: 'Recruiter note attached to the candidate (used in follow-up emails)',
+					},
 				],
 			},
 
@@ -460,19 +565,15 @@ export class Hirempire implements INodeType {
 				let endpoint = '';
 				const qs: IDataObject = {};
 				let body: IDataObject = {};
-				// Property of the response holding an array we want to spread into items
-				let arrayProperty: string | undefined;
 
 				if (resource === 'job') {
 					if (operation === 'getAll') {
 						method = 'GET';
 						endpoint = '/jobs';
-						arrayProperty = 'jobs';
 					} else if (operation === 'get') {
 						method = 'GET';
 						endpoint = '/get-job';
 						qs.job_id = this.getNodeParameter('jobId', i) as string;
-						arrayProperty = 'job';
 					} else if (operation === 'create') {
 						method = 'POST';
 						endpoint = '/add-job';
@@ -506,28 +607,48 @@ export class Hirempire implements INodeType {
 						method = 'DELETE';
 						endpoint = '/delete-job';
 						qs.job_id = this.getNodeParameter('jobId', i) as string;
+					} else if (operation === 'getSources') {
+						method = 'GET';
+						endpoint = '/job-sources';
+						qs.job_id = this.getNodeParameter('jobId', i) as string;
+					} else if (operation === 'createSource') {
+						method = 'POST';
+						endpoint = '/create-source';
+						body = {
+							job_id: this.getNodeParameter('jobId', i) as string,
+							source_name: this.getNodeParameter('sourceName', i) as string,
+						};
 					}
-				} else if (resource === 'applicant') {
+				} else if (resource === 'candidate') {
 					if (operation === 'getAll') {
 						method = 'GET';
-						endpoint = '/applicants';
-						arrayProperty = 'applicants';
+						endpoint = '/candidates';
+						const type = this.getNodeParameter('candidateType', i, '') as string;
+						if (type) qs.type = type;
 					} else if (operation === 'get') {
 						method = 'GET';
-						endpoint = '/get-applicant';
-						qs.applicant_id = this.getNodeParameter('applicantId', i) as string;
-						arrayProperty = 'applicant';
+						endpoint = '/get-candidate';
+						qs.candidate_id = this.getNodeParameter('candidateId', i) as string;
 					} else if (operation === 'getByJob') {
 						method = 'GET';
-						endpoint = '/job-applicants';
-						qs.job_id = this.getNodeParameter('applicantJobId', i) as string;
-						arrayProperty = 'applicants';
-					} else if (operation === 'updateStatus') {
+						endpoint = '/job-candidates';
+						qs.job_id = this.getNodeParameter('candidateJobId', i) as string;
+					} else if (operation === 'update') {
 						method = 'PATCH';
-						endpoint = '/update-applicant';
+						endpoint = '/update-candidate';
+						const updateFields = this.getNodeParameter(
+							'candidateUpdateFields',
+							i,
+						) as IDataObject;
+						if (typeof updateFields.tags === 'string') {
+							updateFields.tags = (updateFields.tags as string)
+								.split(',')
+								.map((t) => t.trim())
+								.filter((t) => t.length > 0);
+						}
 						body = {
-							applicant_id: this.getNodeParameter('applicantId', i) as string,
-							status: this.getNodeParameter('applicantStatus', i) as string,
+							candidate_id: this.getNodeParameter('candidateId', i) as string,
+							...updateFields,
 						};
 					}
 				} else if (resource === 'company') {
@@ -564,24 +685,10 @@ export class Hirempire implements INodeType {
 					options,
 				)) as IDataObject;
 
-				if (
-					arrayProperty &&
-					responseData &&
-					Array.isArray(responseData[arrayProperty])
-				) {
-					const records = responseData[arrayProperty] as IDataObject[];
-					for (const record of records) {
-						returnData.push({
-							json: record,
-							pairedItem: { item: i },
-						});
-					}
-				} else {
-					returnData.push({
-						json: responseData,
-						pairedItem: { item: i },
-					});
-				}
+				returnData.push({
+					json: responseData,
+					pairedItem: { item: i },
+				});
 			} catch (error) {
 				if (this.continueOnFail()) {
 					returnData.push({
